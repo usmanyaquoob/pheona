@@ -1,54 +1,41 @@
+# frontend-streamlit/client/api.py
 from __future__ import annotations
 import os
-from typing import Any, Dict, Optional
-import httpx
+import requests
+import streamlit as st
 
-BACKEND_URL = os.getenv("PHEONA_BACKEND_URL", "").rstrip("/")
-API_KEY = os.getenv("PHEONA_API_KEY", "")
+# Streamlit Cloud → set in .streamlit/secrets.toml
+BACKEND_BASE_URL = st.secrets.get("BACKEND_BASE_URL", os.getenv("BACKEND_BASE_URL", "http://127.0.0.1:8000"))
+BACKEND_API_KEY  = st.secrets.get("BACKEND_API_KEY",  os.getenv("BACKEND_API_KEY", ""))
 
-def _headers() -> Dict[str, str]:
-    headers = {"Content-Type": "application/json"}
-    if API_KEY:
-        headers["X-API-Key"] = API_KEY
-    return headers
+def _headers() -> dict:
+    hdrs = {"Content-Type": "application/json"}
+    if BACKEND_API_KEY:
+        hdrs["X-API-Key"] = BACKEND_API_KEY
+    return hdrs
 
 def is_backend_configured() -> bool:
-    return bool(BACKEND_URL)
+    try:
+        r = requests.get(f"{BACKEND_BASE_URL}/v1/health", timeout=6)
+        return r.ok
+    except Exception:
+        return False
 
-def preview_agent(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Calls POST /v1/agent/preview on your backend.
-    Returns: {"missing":[...], "previewPrompt":"..."} or a mock response if backend not set.
-    """
-    if not BACKEND_URL:
-        # Demo-mode fallback so the UI still works without backend wired yet.
-        return {
-            "missing": [],
-            "previewPrompt": f"[DEMO] Previewing prompt for agent '{payload.get('agent_name')}' at '{payload.get('business_name')}'."
-        }
+def preview_agent(payload: dict) -> dict:
+    url = f"{BACKEND_BASE_URL}/v1/agent/preview"
+    r = requests.post(url, json=payload, headers=_headers(), timeout=30)
+    if not r.ok:
+        raise RuntimeError(f"Server error '{r.status_code} {r.reason}' → {r.text}")
+    return r.json()
 
-    url = f"{BACKEND_URL}/v1/agent/preview"
-    with httpx.Client(timeout=30) as client:
-        r = client.post(url, headers=_headers(), json=payload)
-        r.raise_for_status()
-        return r.json()
+def create_agent(payload: dict) -> dict:
+    # default to provisioning a number in MVP
+    body = dict(payload)
+    body.setdefault("template_key", "insurance/motor_trucking/inbound")
+    body.setdefault("provision_phone_number", True)
 
-def create_agent(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Calls POST /v1/agent/create on your backend.
-    Returns: {"slug":"...", "editToken":"...", "assistantId":"...", "phoneNumber":"..."} or a mock.
-    """
-    if not BACKEND_URL:
-        # Demo-mode fallback so you can click through end-to-end today.
-        return {
-            "slug": "demo-motor-trucking-inbound",
-            "editToken": "demo-token",
-            "assistantId": "asst_demo_123",
-            "phoneNumber": "+1 (555) 010-2025"
-        }
-
-    url = f"{BACKEND_URL}/v1/agent/create"
-    with httpx.Client(timeout=60) as client:
-        r = client.post(url, headers=_headers(), json=payload)
-        r.raise_for_status()
-        return r.json()
+    url = f"{BACKEND_BASE_URL}/v1/agent/create"
+    r = requests.post(url, json=body, headers=_headers(), timeout=60)
+    if not r.ok:
+        raise RuntimeError(f"Server error '{r.status_code} {r.reason}' → {r.text}")
+    return r.json()

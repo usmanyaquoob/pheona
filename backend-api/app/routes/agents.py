@@ -4,12 +4,11 @@ from ..auth import require_api_key
 from ..models import (
     AgentBuilderPayload, PreviewResponse, MissingFieldReport,
     PromptPreview, CreateAgentRequest, CreateAgentResponse,
-    LoadAgentResponse, SavedAgent
 )
 from ..templates import load_template, load_prompt_text, check_required
 from ..prompt_specializer import specialize
 from .. import vapi_client
-from ..redis_client import r
+# from ..redis_client import r   # 🔕 disabled for now
 from ..utils import slugify, short_id, new_edit_token
 from ..config import settings
 import json
@@ -86,27 +85,15 @@ async def agent_create(body: CreateAgentRequest):
                 assistant_id=assistant_id,
                 label=f"{body.agent_name} Line",
             )
-            # Response shape includes "number" for VapiPhoneNumber objects.
             phone_number = pn.get("number") or pn.get("e164") or pn.get("name")
         except httpx.HTTPStatusError as e:
             detail_txt = e.response.text if e.response is not None else str(e)
             log.error("Phone provisioning failed: %s", detail_txt)
-            # Soft-fail: keep building the agent record; phone can be added later.
             phone_number = None
 
+    # Generate, but DON'T persist (Redis is disabled for now)
     slug = f"{slugify(body.agent_name)}-{short_id()}"
     edit_token = new_edit_token()
-
-    # Persist to Redis
-    r.hset(f"agent:{slug}", mapping={
-        "assistantId": assistant_id,
-        "phoneNumber": phone_number or "",
-        "payload": json.dumps(body.model_dump()),
-        "system_prompt": system_prompt,
-        "first_message": first_message,
-        "editToken": edit_token,
-    })
-    r.set(f"agent:by_token:{edit_token}", slug)
 
     return CreateAgentResponse(
         slug=slug,
@@ -118,22 +105,10 @@ async def agent_create(body: CreateAgentRequest):
         first_message=first_message,
     )
 
-@router.get("/agent/{slug}", response_model=LoadAgentResponse, dependencies=[Depends(require_api_key)])
+@router.get("/agent/{slug}", dependencies=[Depends(require_api_key)])
 async def load_agent(slug: str, token: str = Query(..., description="edit token")):
-    data = r.hgetall(f"agent:{slug}")
-    if not data:
-        raise HTTPException(status_code=404, detail="Not found")
-    if data.get("editToken") != token:
-        raise HTTPException(status_code=403, detail="Invalid token")
-
-    payload = json.loads(data["payload"])
-    obj = SavedAgent(
-        slug=slug,
-        editToken=data["editToken"],
-        assistantId=data["assistantId"],
-        phoneNumber=data.get("phoneNumber") or None,
-        payload=payload,
-        system_prompt=data["system_prompt"],
-        first_message=data["first_message"]
+    # Redis is disabled in this MVP step.
+    raise HTTPException(
+        status_code=501,
+        detail="Loading saved agents is temporarily disabled (Redis persistence off)."
     )
-    return LoadAgentResponse(**obj.model_dump())
