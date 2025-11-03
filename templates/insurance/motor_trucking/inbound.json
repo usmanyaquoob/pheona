@@ -1,0 +1,41 @@
+{
+  "kind": "AssistantTemplate",
+  "version": 1,
+  "templateKey": "insurance/motor_trucking/inbound",
+  "metadata": {
+    "name": "Motor Trucking — Inbound Lead Capture",
+    "industry": "insurance",
+    "subcategory": "motor_trucking",
+    "use_case": "inbound_lead_capture"
+  },
+  "defaults": {
+    "model": {
+      "provider": "groq",
+      "model": "meta-llama/llama-3.1-70b-versatile"
+    },
+    "transcriber": {
+      "provider": "deepgram",
+      "model": "nova-2"
+    },
+    "voice": {
+      "provider": "vapi",
+      "voiceId": "default"
+    },
+    "behavior": {
+      "bargeIn": true,
+      "maxSilenceSeconds": 4
+    },
+    "transfer": {
+      "enabled": true,
+      "number": null
+    }
+  },
+  "required_fields": [
+    "business_name",
+    "voice_gender",
+    "info_to_collect"
+  ],
+  "system_prompt_base_path": "prompts/insurance/motor_trucking/inbound_base.md",
+  "prompt_specialization_instructions_path": "prompts/_meta/specialize_prompt.md",
+  "notes": "Backend should use Groq Structured Outputs to merge user selections into a final prompt, then create a Vapi Assistant + Phone number."
+}
