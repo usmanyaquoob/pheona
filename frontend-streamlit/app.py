@@ -64,7 +64,7 @@ tpl = load_template()
 section_header("1) Identity")
 col1, col2 = st.columns(2)
 agent_name = col1.text_input("Agent name", placeholder="e.g., Alex", max_chars=40)
-business_name = col2.text_input("Business name", placeholder="e.g., Amsys Insurance", max_chars=80)
+business_name = col2.text_input("Business name", placeholder="e.g., Anvil Insurance", max_chars=80)
 website = st.text_input("Website (optional)", placeholder="https://example.com")
 
 # voice & language
