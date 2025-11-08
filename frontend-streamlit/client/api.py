@@ -29,13 +29,18 @@ def preview_agent(payload: dict) -> dict:
     return r.json()
 
 def create_agent(payload: dict) -> dict:
-    # default to provisioning a number in MVP
     body = dict(payload)
     body.setdefault("template_key", "insurance/motor_trucking/inbound")
     body.setdefault("provision_phone_number", True)
-
     url = f"{BACKEND_BASE_URL}/v1/agent/create"
     r = requests.post(url, json=body, headers=_headers(), timeout=60)
     if not r.ok:
         raise RuntimeError(f"Server error '{r.status_code} {r.reason}' → {r.text}")
+    return r.json()
+
+def load_agent(slug: str, token: str) -> dict:
+    url = f"{BACKEND_BASE_URL}/v1/agent/{slug}"
+    r = requests.get(url, params={"token": token}, headers=_headers(), timeout=20)
+    if not r.ok:
+        raise RuntimeError(f"Load failed '{r.status_code} {r.reason}' → {r.text}")
     return r.json()
